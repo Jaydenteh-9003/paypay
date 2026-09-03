@@ -1,0 +1,10 @@
+.git
+.openai
+.agents
+.codex
+.next
+node_modules
+out
+work
+.env*
+*.tsbuildinfo

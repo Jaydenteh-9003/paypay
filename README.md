@@ -58,3 +58,16 @@ The tests cover cent parsing, real calendar dates, persistence, failed writes, b
 When the browser exposes `document.modelContext`, Paypay registers `read_month_summary` and `create_transaction`. Both use the actual local ledger and the same validators as the visible UI. Unsupported browsers work normally. Contract execution requires a supported WebMCP browser; availability is feature-detected.
 
 Initial validation: production build and TypeScript passed, all eight data tests passed, npm reported zero known vulnerabilities, and the generated offline worker passed a mocked fetch/cache contract check with all precached assets present. The available browser reported no WebMCP tools, so WebMCP execution was not verified. Broad browser UI and physical-phone installation testing were not performed.
+
+## Publish on Vercel
+
+The included `vercel.json` builds the Next.js static export with `npm run build` and serves `out/`, including the generated offline worker. No Vercel database or server function is needed. The `Other` framework preset is intentional: it preserves the complete exported output and the postbuild offline assets.
+
+```sh
+npx vercel login
+npx vercel --prod
+```
+
+The production domain is read from Vercel’s `VERCEL_PROJECT_PRODUCTION_URL` for canonical, social, and sitemap URLs. Set `NEXT_PUBLIC_SITE_URL` only if you want an explicit custom domain instead. `robots.txt` and `sitemap.xml` allow discovery, but publishing does not guarantee when a search engine will index the site.
+
+Moving to a Vercel address creates a separate browser storage location. Download a JSON backup from the original Paypay site, then restore that backup at the Vercel address. The old site and its browser data remain separate.
