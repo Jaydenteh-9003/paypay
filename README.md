@@ -56,3 +56,5 @@ The tests cover cent parsing, real calendar dates, persistence, failed writes, b
 ## Optional WebMCP
 
 When the browser exposes `document.modelContext`, Paypay registers `read_month_summary` and `create_transaction`. Both use the actual local ledger and the same validators as the visible UI. Unsupported browsers work normally. Contract execution requires a supported WebMCP browser; availability is feature-detected.
+
+Initial validation: production build and TypeScript passed, all eight data tests passed, npm reported zero known vulnerabilities, and the generated offline worker passed a mocked fetch/cache contract check with all precached assets present. The available browser reported no WebMCP tools, so WebMCP execution was not verified. Broad browser UI and physical-phone installation testing were not performed.

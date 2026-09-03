@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 export const metadata: Metadata = {
-metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://paypay-jayde.jaydentehjingsiang.chatgpt.site'),
 title: 'Paypay — A little clarity, every day',
 description: 'Your personal space for everyday expenses, freelance income, and campus life. Saved on your device.',
 openGraph: { title: 'Paypay — A little clarity, every day', description: 'Everyday expenses, freelance income, and campus life. Your money, at a glance.', type: 'website', images: [{ url: '/og.png', width: 1729, height: 910, alt: 'paypay. A little clarity, every day.' }] },

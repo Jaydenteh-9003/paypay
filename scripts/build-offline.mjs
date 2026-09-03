@@ -41,8 +41,14 @@ self.addEventListener('fetch', event => {
     })());
     return;
   }
-  if (PRECACHE.includes(url.pathname)) {
-    event.respondWith(caches.open(CACHE).then(async cache => (await cache.match(url.pathname)) || fetch(event.request)));
+  if (PRECACHE.includes(url.pathname) || url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(caches.open(CACHE).then(async cache => {
+      const stored = await cache.match(url.pathname);
+      if (stored) return stored;
+      const response = await fetch(event.request);
+      if (response.ok && !response.redirected) await cache.put(url.pathname, response.clone());
+      return response;
+    }));
   }
 });
 `;
