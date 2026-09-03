@@ -1,49 +1,187 @@
 # Paypay
 
-A spacious, mobile-friendly personal finance tracker for university life, freelancing, internships, and the everyday.
+### A little clarity, every day.
 
-## Stack
+A personal finance tracker for university life, freelance work, internships, and everything in between. Built for quick entries on a phone, with a quiet interface and a ledger that stays in the user's browser.
 
-Next.js **16.2.12** (App Router, static export), React 19, Tailwind CSS 4, Framer Motion, shadcn/ui with Base UI, Lucide, and Recharts. No database, analytics, external fonts, or finance API.
+![Paypay brand preview — A little clarity, every day.](public/og.png)
 
-## Local development
+**Next.js 16.2 · TypeScript · Tailwind CSS · Framer Motion · shadcn/ui**
+
+[Why I built it](#why-i-built-paypay) · [Features](#what-it-does) · [Architecture](#architecture) · [Privacy](#privacy-and-backup) · [Run locally](#run-locally) · [Deploy](#deploy-on-vercel)
+
+## Why I built Paypay
+
+As a university student, freelancer, and intern, I wanted one place to record the different sides of my finances: everyday spending, student allowances, freelance payments, and internship income.
+
+My goal was straightforward: open a website on my phone, record an entry in a few seconds, and understand where my money is going. I wanted the interface to feel spacious and considered, so tracking money could become a small daily habit.
+
+Privacy and cost shaped the brief from the beginning. A personal finance tracker handles sensitive information, but recording a lunch expense does not require a bank connection, a remote database, or a recurring storage subscription. I wanted the application to work with only the data and access its core task actually needs.
+
+That led to three product priorities:
+
+- **Low effort:** quick entry, useful defaults, and controls that work on a phone.
+- **A clear picture:** income and expenses organized around the different areas of my life.
+- **User control:** local records, explicit exports, and recovery without making a cloud account mandatory.
+
+## What it does
+
+| Capability | Current implementation |
+| --- | --- |
+| Daily tracking | Add, edit, and delete income or expenses with a date, description, category, and optional note. |
+| Different areas of life | Organize entries under Personal, University, Freelance, or Internship. |
+| Monthly overview | See recorded income, expenses, and net cashflow, with weekly charts and category breakdowns. |
+| Spending plans | Set a separate spending limit for each month and see the amount remaining or exceeded. |
+| Search and filters | Find entries by text, type, category, area of life, and month or all time. |
+| Backup and transfer | Export a JSON backup, validate and merge an imported backup, or export transactions as CSV. |
+| Phone access | Responsive navigation and a web app manifest for home-screen installation in supported browsers. |
+| Offline use | Cache the production app shell after an online visit; keep recording entries locally. |
+| Sample view | Explore example data without adding it to the real ledger. |
+
+**Try it:** run the app locally or deploy it, then choose **Preview sample** to explore a populated dashboard. The real ledger starts empty.
+
+## Architecture
+
+Paypay uses a static Next.js export. The hosting platform delivers the application files; normal transaction entry and financial calculations happen in the browser.
+
+```mermaid
+flowchart TD
+    Host["Static hosting: Vercel or another HTTPS host"]
+    Host -->|"HTML, JavaScript, CSS and icons"| UI
+
+    subgraph Browser["User's browser"]
+        UI["React interface"]
+        Rules["Validation and finance functions"]
+        Ledger[("localStorage: primary ledger")]
+        Cache["Service worker: cached app shell"]
+        File["User-selected JSON backup"]
+
+        UI <--> Rules
+        Rules <--> Ledger
+        Cache -->|"Offline app files"| UI
+        UI -->|"Explicit export"| File
+        File -->|"Validate, then merge on restore"| Rules
+    end
+
+    File -.->|"User may upload manually"| Backup["Chosen backup location: disk or cloud"]
+    Backup -.->|"User downloads for restore"| File
+```
+
+The dotted cloud path is a **manual file workflow**, not an implemented cloud integration. No transaction API, remote ledger database, bank integration, or automatic device synchronization is required.
+
+### Why these choices?
+
+| Decision | Reason | Trade-off |
+| --- | --- | --- |
+| Next.js App Router with static export | Provides a structured React project, metadata support, and portable static output without needing a transaction server. | Server-dependent features would require a separate design. |
+| Browser `localStorage` | Fits the initial, small, device-local ledger and persists it across ordinary browser sessions. | Synchronous, capacity-limited, and dependent on browser storage being available. |
+| Integer cents | Keeps amounts and totals out of floating-point decimal arithmetic. | Supported currencies use a fixed two-decimal representation; currency conversion is outside the scope. |
+| Shared validation functions | Entry forms, imports, persistence, and optional agent tools use the same transaction rules. | Validation protects data shape, not against a compromised browser. |
+| Versioned JSON backups | Makes records portable and allows the whole import to be checked before saving. | Users must keep backups; there is no automatic recovery service. |
+| A separate offline app cache | Keeps application files available without duplicating the ledger into the service worker cache. | Installation and offline readiness depend on browser support and a successful initial visit. |
+| Tailwind CSS and shadcn/ui | Provide consistent styling and reusable interaction primitives. | Accessibility still requires integration testing; using a component library is not a substitute for it. |
+| Framer Motion and Recharts | Add restrained transitions and readable financial summaries. Motion respects the user's reduced-motion preference. | These libraries add client-side code, so they are used for specific interface needs. |
+
+The ledger is stored under `paypay.ledger.v1`. Its versioned structure contains the currency, transactions, and month-specific budgets. Finance and storage logic live in [`lib/finance.ts`](lib/finance.ts), separately from the interface in [`components/finance-app.tsx`](components/finance-app.tsx).
+
+## Privacy and backup
+
+### Local data is the default
+
+Paypay's application code does not upload financial records during normal use. There is no analytics integration, bank authorization, or cloud-storage permission request in the current app. Hosting the website in the cloud is separate from storing the user's ledger there.
+
+Browser storage is scoped to an origin, so a different domain, port, browser profile, or device has a separate ledger. This behavior is documented in [MDN's Web Storage overview](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API).
+
+### How least privilege informs the design
+
+[NIST describes least privilege](https://csrc.nist.gov/glossary/term/least_privilege) as limiting access to what is necessary for a task. For Paypay, that means asking which component needs access to which information before introducing another service or permission.
+
+- Recording an expense does not need access to a bank account.
+- Calculating a monthly total does not need a remote database.
+- Restoring a backup needs the file the user selects, not general access to their filesystem or cloud drive.
+- A future cloud backup feature should receive only the access needed to store and retrieve that user's backup.
+
+Keeping records local is primarily a **data-minimization decision** that supports this direction. It does not, by itself, prove that the entire application enforces least privilege.
+
+### Cloud storage should be a backup, not a prerequisite
+
+The architectural intention is for the browser ledger to remain the primary working copy. Cloud storage, if introduced, should serve an optional recovery purpose rather than become a dependency for every entry.
+
+**Available now:** download a JSON backup and store it wherever you choose, including a cloud folder you manage yourself. Paypay does not receive access to that cloud account. Current JSON and CSV exports are **unencrypted**, so uploading them may expose their contents to the chosen provider or anyone with access to the file.
+
+**Future design, not yet implemented:** an opt-in cloud backup integration should:
+
+1. Encrypt the backup on the client before upload, with an explicit key-recovery design.
+2. Request the narrowest provider-supported scope, ideally a dedicated app folder or selected backup file.
+3. Upload only the backup needed for the action the user authorized.
+4. Provide clear controls for backup, restore, disconnection, and permission revocation.
+5. Keep ordinary tracking usable when cloud access is unavailable or revoked.
+
+This combines backup availability with limited access. Merely putting a backup in the cloud does not establish least privilege; permission scope and access boundaries are what matter.
+
+### The limits of this approach
+
+Local storage is not an encrypted vault. Same-origin JavaScript can access the ledger, so an XSS flaw, compromised dependency, or malicious app update could expose it. Someone with access to an unlocked browser profile may also be able to read the data. The host remains part of the trust model because it delivers the code, and it can observe ordinary website requests even though the app does not send it the ledger.
+
+Clearing browser data, using private browsing, or losing a device can remove records. Browser storage also has quotas and can fail; see [MDN's storage limits and eviction guidance](https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria). Regular backups are part of the workflow, not a guarantee supplied by the hosting platform.
+
+## Handling data carefully
+
+The implementation includes several safeguards around ordinary mistakes and recovery:
+
+- **Validate before saving.** Amounts, real calendar dates, categories, areas of life, IDs, and backup structure are checked.
+- **Report failed writes.** A storage failure does not silently report a saved transaction; the entry form remains available.
+- **Preserve unreadable data.** A failed initial read does not automatically replace the saved ledger with an empty one. Settings offers a recovery copy before an explicit replacement restore.
+- **Merge predictably.** Existing records win when transaction IDs match, and existing monthly budgets win over imported ones. Backups with a different currency cannot merge into a populated ledger.
+- **Keep examples separate.** Sample transactions are generated for display and never persisted as real entries.
+- **Handle CSV text.** Exported fields are quoted, and leading spreadsheet-formula characters are guarded.
+
+These measures support data integrity and recovery. They are not a claim of formal security certification.
+
+## Interface direction
+
+The visual brief was minimalist and spacious: warm off-white surfaces, forest green accents, muted category colors, and clear numerical hierarchy. The main action stays close to the monthly overview, and mobile navigation keeps entry creation within reach.
+
+The interface is organized around useful questions: What came in? What went out? What is left in the budget? Which area of life does this entry belong to? This keeps the project focused on a daily personal workflow.
+
+## Run locally
+
+Requires **Node.js 22.13 or newer** and npm.
 
 ```sh
-npm install
+git clone https://github.com/Jaydenteh-9003/paypay.git
+cd paypay
+npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. The development server binds to all network interfaces; on the same Wi-Fi, a phone can use the computer’s LAN IP on port 3000 if the firewall permits. The computer must stay on. LAN HTTP previews do not support installing the offline app; use HTTPS hosting for phone installation.
+Open [localhost:3000](http://localhost:3000).
 
-## Build and run
+For a phone on the same Wi-Fi, use your computer's LAN IP on port 3000 if the firewall permits. The computer must remain on. Use an HTTPS deployment for phone installation and service worker support; a plain HTTP LAN preview is intended for development.
+
+To build and serve the production files locally:
 
 ```sh
 npm run build
 npm start
 ```
 
-The build exports public assets to `out/`. The postbuild script generates a versioned service worker from the exact exported assets. The included static server serves `out/` (default port 3000, configurable with PORT). You can deploy this directory on a static HTTPS host without a backend or storage subscription.
+The build writes the static site to `out/`. The postbuild script generates a versioned offline worker from the exported assets. The included static server uses port 3000 by default, configurable through `PORT`.
 
-## Features
+## Deploy on Vercel
 
-- Add, edit, and delete expenses and income with exact integer-cent amounts.
-- Categories, date, notes, and Personal / University / Freelance / Internship areas.
-- Monthly totals, weekly cashflow, category breakdowns, and monthly spending limits.
-- Search and filter entries by type, area, category, and month or all time.
-- Explicit sample mode that never persists sample records.
-- JSON backup and validated merge restore. CSV export guards spreadsheet formula prefixes.
-- Per-browser persistence, storage-error handling, and same-origin tab updates.
-- Home-screen installation and offline app shell after a successful production visit.
+1. Import this GitHub repository into Vercel.
+2. Use `main` as the production branch and the repository root as the project root.
+3. Keep the checked-in [`vercel.json`](vercel.json) settings: **Other** framework preset, **`npm run build`** build command, and **`out`** output directory.
+4. Deploy, open the production URL on your phone, and use the browser's **Add to Home Screen** option.
 
-## Data and backup
+The Other preset is intentional: Next.js still builds the app, while Vercel serves the complete static output, including the postbuild offline assets. No database or server function is needed.
 
-The ledger is stored only in `localStorage` under `paypay.ledger.v1`. It is not synchronized or sent to a server. Each browser and each origin (including localhost versus the hosted URL) has a separate ledger. Browser data deletion, private browsing cleanup, or storage eviction can remove records. Use Settings → Download backup regularly and restore the JSON on another device to transfer records. Backups contain unencrypted financial records; store them where you normally keep personal files.
+Canonical, social-preview, and sitemap URLs use Vercel's `VERCEL_PROJECT_PRODUCTION_URL`. An explicit `NEXT_PUBLIC_SITE_URL` takes precedence for a custom domain or another host. Outside Vercel, the current fallback is the original hosted Paypay address; set the explicit URL when publishing elsewhere.
 
-Imports validate the whole backup before making changes. Matching transaction IDs keep the current record; existing month budgets win. Different currencies cannot be merged into a populated ledger. Unreadable storage is preserved until an explicit recovery restore; download the original recovery copy first.
+**Changing addresses does not transfer records.** Export a backup from the old address and restore it at the new one. Search-engine metadata and a sitemap help discovery, but publishing does not guarantee indexing.
 
-Net this month means recorded income minus recorded expenses, not a bank balance. Future transactions are not supported. Budgets are specific to each selected month. The currency can be chosen before any records or budgets exist; the app does not convert money.
-
-## Checks
+## Verification
 
 ```sh
 npm test
@@ -51,23 +189,55 @@ npm run typecheck
 npm run build
 ```
 
-The tests cover cent parsing, real calendar dates, persistence, failed writes, backup validation and merge rules, monthly/weekly totals, and CSV escaping. Browser UI and device installation tests are separate from these checks.
+The [automated data suite](tests/finance.test.ts) contains eight tests covering amount parsing, calendar boundaries, persistence and edits, failed writes, backup validation, merge behavior, monthly and weekly totals, and CSV escaping.
 
-## Optional WebMCP
+The implementation has also passed a production build and TypeScript checks. The generated offline worker was checked with a mocked cache/fetch contract, including offline navigation and retaining newly fetched assets across updates. Physical-phone installation and broad browser UI testing remain separate validation work.
 
-When the browser exposes `document.modelContext`, Paypay registers `read_month_summary` and `create_transaction`. Both use the actual local ledger and the same validators as the visible UI. Unsupported browsers work normally. Contract execution requires a supported WebMCP browser; availability is feature-detected.
+An experimental, feature-detected WebMCP interface exposes `read_month_summary` and `create_transaction` through the same ledger functions. It is not required for normal use. Execution in a supported WebMCP browser has not been verified.
 
-Initial validation: production build and TypeScript passed, all eight data tests passed, npm reported zero known vulnerabilities, and the generated offline worker passed a mocked fetch/cache contract check with all precached assets present. The available browser reported no WebMCP tools, so WebMCP execution was not verified. Broad browser UI and physical-phone installation testing were not performed.
+## Project guide
 
-## Publish on Vercel
-
-The included `vercel.json` builds the Next.js static export with `npm run build` and serves `out/`, including the generated offline worker. No Vercel database or server function is needed. The `Other` framework preset is intentional: it preserves the complete exported output and the postbuild offline assets.
-
-```sh
-npx vercel login
-npx vercel --prod
+```text
+app/
+  page.tsx                 Application entry point
+  layout.tsx               Site metadata and global layout
+  globals.css              Theme and responsive styles
+  robots.ts, sitemap.ts    Search-engine metadata
+components/
+  finance-app.tsx          Overview, entry forms, budgets, and settings
+  ui/                      Shared shadcn/ui primitives
+lib/
+  finance.ts               Ledger model, validation, storage, and calculations
+  site-url.ts              Canonical deployment origin
+scripts/
+  build-offline.mjs        Generate the production offline worker
+  serve.mjs                Serve the static export locally
+tests/
+  finance.test.ts          Data and persistence tests
+public/
+  manifest.webmanifest     Installable web app metadata
+  icons/                   App icons
+vercel.json                Static hosting configuration
 ```
 
-The production domain is read from Vercel’s `VERCEL_PROJECT_PRODUCTION_URL` for canonical, social, and sitemap URLs. Set `NEXT_PUBLIC_SITE_URL` only if you want an explicit custom domain instead. `robots.txt` and `sitemap.xml` allow discovery, but publishing does not guarantee when a search engine will index the site.
+## What this project demonstrates
 
-Moving to a Vercel address creates a separate browser storage location. Download a JSON backup from the original Paypay site, then restore that backup at the Vercel address. The old site and its browser data remain separate.
+Paypay brings together product decisions, interface work, and architecture around a specific personal need:
+
+- Translating several real-life income and spending contexts into one small workflow.
+- Choosing the amount of infrastructure the problem needs, and documenting what that choice gives up.
+- Treating privacy, access scope, recovery, and data portability as design decisions.
+- Separating testable financial rules from presentation code.
+- Delivering a mobile-oriented web app with a reproducible static deployment.
+
+The project uses AI-assisted development. The motivation, intended workflows, visual direction, and privacy priorities come from my personal brief; the repository makes the resulting implementation and its limitations available for review.
+
+## Next steps
+
+- [ ] Test installation, offline recovery, and backup transfer on physical iOS and Android devices.
+- [ ] Review keyboard navigation, screen-reader behavior, touch targets, and contrast across the interface.
+- [ ] Add encrypted backup export with a documented recovery model.
+- [ ] Explore optional cloud backup with narrowly scoped, revocable access.
+- [ ] Evaluate IndexedDB if ledger size or write frequency outgrows localStorage.
+
+Bank synchronization, automatic multi-device sync, encrypted local records, and integrated cloud backup are outside the current release. Net cashflow means recorded income minus recorded expenses; it is not a verified bank balance.
