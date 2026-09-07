@@ -151,7 +151,7 @@ These measures support data integrity and recovery. They are not a claim of form
 
 ## Interface direction
 
-The visual brief was minimalist and spacious: warm off-white surfaces, forest green accents, muted category colors, and clear numerical hierarchy. The main action stays close to the monthly overview, and mobile navigation keeps entry creation within reach.
+The visual system is minimalist and editorial: a deep green navigation rail, a warm paper-like canvas, large serif headlines, strong financial numerals, and low-contrast surfaces that separate information without surrounding every element with a border. The main action stays close to the monthly overview, while a floating mobile navigation bar keeps scanning and the core views within thumb reach.
 
 The interface is organized around useful questions: What came in? What went out? What is left in the budget? Which area of life does this entry belong to? The scan flow adds one more deliberate question before saving: did the image get every detail right?
 
