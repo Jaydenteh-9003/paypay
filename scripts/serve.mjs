@@ -6,7 +6,7 @@ const types = { '.html': 'text/html; charset=utf-8', '.js': 'application/javascr
 const port = Number(process.env.PORT || 3000);
 createServer(async (req, res) => {
   try {
-    let relative = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+    const relative = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     let file = path.resolve(root, '.' + relative);
     if (file !== root && !file.startsWith(root + path.sep)) { res.writeHead(403).end(); return; }
     if ((await stat(file)).isDirectory()) file = path.join(file, 'index.html');

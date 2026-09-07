@@ -41,7 +41,7 @@ self.addEventListener('fetch', event => {
     })());
     return;
   }
-  if (PRECACHE.includes(url.pathname) || url.pathname.startsWith('/_next/static/')) {
+  if (PRECACHE.includes(url.pathname) || url.pathname.startsWith('/_next/static/') || url.pathname.startsWith('/ocr/')) {
     event.respondWith(caches.open(CACHE).then(async cache => {
       const stored = await cache.match(url.pathname);
       if (stored) return stored;

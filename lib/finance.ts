@@ -26,6 +26,7 @@ export function isValidDate(value: unknown): value is string {
   return year >= 2000 && year <= 2100 && date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 function object(value: unknown): value is Record<string, unknown> { return !!value && typeof value === 'object' && !Array.isArray(value); }
+function hasControlCharacters(value: string) { for (let index = 0; index < value.length; index++) { const code = value.charCodeAt(index); if (code <= 31 || code === 127) return true; } return false; }
 export function validateTransaction(value: unknown): Transaction {
   if (!object(value)) throw new Error('Invalid transaction.');
   const { id, type, amountCents, title, category, role, date, note } = value;
@@ -33,11 +34,11 @@ export function validateTransaction(value: unknown): Transaction {
   if (type !== 'expense' && type !== 'income') throw new Error('Choose expense or income.');
   if (!Number.isSafeInteger(amountCents) || (amountCents as number) <= 0 || (amountCents as number) > 99999999999) throw new Error('Invalid transaction amount.');
   if (typeof title !== 'string' || !title.trim() || title.length > 80) throw new Error('Add a description of up to 80 characters.');
-  if (typeof category !== 'string' || !(categoriesFor(type) as readonly string[]).includes(category)) throw new Error('Choose a valid category for this transaction.');
+  if (typeof category !== 'string' || !category.trim() || category.trim().length > 60 || hasControlCharacters(category)) throw new Error('Add a category of up to 60 characters.');
   if (!ROLES.includes(role as Role)) throw new Error('Choose a valid area of life.');
   if (!isValidDate(date)) throw new Error('Choose a valid date between 2000 and 2100.');
   if (typeof note !== 'string' || note.length > 300) throw new Error('Keep your note to 300 characters.');
-  return { id, type, amountCents: amountCents as number, title: title.trim(), category, role: role as Role, date, note: note.trim() };
+  return { id, type, amountCents: amountCents as number, title: title.trim(), category: category.trim(), role: role as Role, date, note: note.trim() };
 }
 export function validateLedger(value: unknown): Ledger {
   if (!object(value) || value.version !== 1 || !CURRENCIES.includes(value.currency as Currency) || !Array.isArray(value.transactions) || !object(value.budgets)) throw new Error('This is not a valid Paypay backup (version 1).');

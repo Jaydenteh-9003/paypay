@@ -15,6 +15,7 @@
 /.next/
 /.vinext/
 /out/
+/public/ocr/
 
 # misc
 .DS_Store

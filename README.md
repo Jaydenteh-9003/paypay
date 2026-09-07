@@ -33,6 +33,9 @@ That led to three product priorities:
 | Monthly overview | See recorded income, expenses, and net cashflow, with weekly charts and category breakdowns. |
 | Spending plans | Set a separate spending limit for each month and see the amount remaining or exceeded. |
 | Search and filters | Find entries by text, type, category, area of life, and month or all time. |
+| On-device OCR import | Read MAE or TNG transaction screenshots and receipt photos in the browser, then review editable drafts before saving. |
+| Receipt totals | Detect a receipt and propose only its labelled final total, excluding item prices, subtotal, tax, cash, and change lines. |
+| Flexible categories | Type a new category when recognition or the built-in suggestions do not fit; saved categories become reusable suggestions. |
 | Backup and transfer | Export a JSON backup, validate and merge an imported backup, or export transactions as CSV. |
 | Phone access | Responsive navigation and a web app manifest for home-screen installation in supported browsers. |
 | Offline use | Cache the production app shell after an online visit; keep recording entries locally. |
@@ -47,7 +50,7 @@ Paypay uses a static Next.js export. The hosting platform delivers the applicati
 ```mermaid
 flowchart TD
     Host["Static hosting: Vercel or another HTTPS host"]
-    Host -->|"HTML, JavaScript, CSS and icons"| UI
+    Host -->|"HTML, JavaScript, CSS, icons and OCR model files"| UI
 
     subgraph Browser["User's browser"]
         UI["React interface"]
@@ -55,12 +58,16 @@ flowchart TD
         Ledger[("localStorage: primary ledger")]
         Cache["Service worker: cached app shell"]
         File["User-selected JSON backup"]
+        Image["Selected screenshot or camera frame: memory only"]
+        OCR["Tesseract.js WebAssembly OCR"]
 
         UI <--> Rules
         Rules <--> Ledger
         Cache -->|"Offline app files"| UI
         UI -->|"Explicit export"| File
         File -->|"Validate, then merge on restore"| Rules
+        Image --> OCR
+        OCR -->|"Editable drafts"| UI
     end
 
     File -.->|"User may upload manually"| Backup["Chosen backup location: disk or cloud"]
@@ -79,6 +86,7 @@ The dotted cloud path is a **manual file workflow**, not an implemented cloud in
 | Shared validation functions | Entry forms, imports, persistence, and optional agent tools use the same transaction rules. | Validation protects data shape, not against a compromised browser. |
 | Versioned JSON backups | Makes records portable and allows the whole import to be checked before saving. | Users must keep backups; there is no automatic recovery service. |
 | A separate offline app cache | Keeps application files available without duplicating the ledger into the service worker cache. | Installation and offline readiness depend on browser support and a successful initial visit. |
+| Tesseract.js in WebAssembly | Keeps receipt and transaction screenshot recognition in the browser. OCR workers, cores, and English model data are copied into the static build instead of loaded from a third-party CDN. | The first scan downloads sizeable OCR files from the Paypay host, recognition can take time on older phones, and every result still needs review. |
 | Tailwind CSS and shadcn/ui | Provide consistent styling and reusable interaction primitives. | Accessibility still requires integration testing; using a component library is not a substitute for it. |
 | Framer Motion and Recharts | Add restrained transitions and readable financial summaries. Motion respects the user's reduced-motion preference. | These libraries add client-side code, so they are used for specific interface needs. |
 
@@ -89,6 +97,8 @@ The ledger is stored under `paypay.ledger.v1`. Its versioned structure contains 
 ### Local data is the default
 
 Paypay's application code does not upload financial records during normal use. There is no analytics integration, bank authorization, or cloud-storage permission request in the current app. Hosting the website in the cloud is separate from storing the user's ledger there.
+
+OCR follows the same boundary. A chosen screenshot or live camera frame stays in browser memory, is passed to the local WebAssembly worker, and is discarded after review. The source image and raw recognized text are not written to the ledger. Only drafts the user explicitly approves become local transactions. Camera access is requested only when the user opens the live camera; the system camera file option lets the operating system handle capture instead.
 
 Browser storage is scoped to an origin, so a different domain, port, browser profile, or device has a separate ledger. This behavior is documented in [MDN's Web Storage overview](https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API).
 
@@ -130,6 +140,7 @@ Clearing browser data, using private browsing, or losing a device can remove rec
 The implementation includes several safeguards around ordinary mistakes and recovery:
 
 - **Validate before saving.** Amounts, real calendar dates, categories, areas of life, IDs, and backup structure are checked.
+- **Review recognition before import.** OCR results remain editable drafts until the user selects and imports them. Receipt detection returns at most one labelled final-total draft.
 - **Report failed writes.** A storage failure does not silently report a saved transaction; the entry form remains available.
 - **Preserve unreadable data.** A failed initial read does not automatically replace the saved ledger with an empty one. Settings offers a recovery copy before an explicit replacement restore.
 - **Merge predictably.** Existing records win when transaction IDs match, and existing monthly budgets win over imported ones. Backups with a different currency cannot merge into a populated ledger.
@@ -142,7 +153,7 @@ These measures support data integrity and recovery. They are not a claim of form
 
 The visual brief was minimalist and spacious: warm off-white surfaces, forest green accents, muted category colors, and clear numerical hierarchy. The main action stays close to the monthly overview, and mobile navigation keeps entry creation within reach.
 
-The interface is organized around useful questions: What came in? What went out? What is left in the budget? Which area of life does this entry belong to? This keeps the project focused on a daily personal workflow.
+The interface is organized around useful questions: What came in? What went out? What is left in the budget? Which area of life does this entry belong to? The scan flow adds one more deliberate question before saving: did the image get every detail right?
 
 ## Run locally
 
@@ -189,7 +200,7 @@ npm run typecheck
 npm run build
 ```
 
-The [automated data suite](tests/finance.test.ts) contains eight tests covering amount parsing, calendar boundaries, persistence and edits, failed writes, backup validation, merge behavior, monthly and weekly totals, and CSV escaping.
+The automated suites contain 14 tests covering amount parsing, calendar boundaries, persistence and edits, failed writes, backup validation, merge behavior, monthly and weekly totals, CSV escaping, receipt-final-total selection, MAE and TNG-style transaction text, date recognition, balance exclusion, and OCR import limits.
 
 The implementation has also passed a production build and TypeScript checks. The generated offline worker was checked with a mocked cache/fetch contract, including offline navigation and retaining newly fetched assets across updates. Physical-phone installation and broad browser UI testing remain separate validation work.
 
@@ -205,15 +216,19 @@ app/
   robots.ts, sitemap.ts    Search-engine metadata
 components/
   finance-app.tsx          Overview, entry forms, budgets, and settings
+  ocr-import.tsx           Image capture, local OCR, review, and import flow
   ui/                      Shared shadcn/ui primitives
 lib/
   finance.ts               Ledger model, validation, storage, and calculations
+  ocr.ts                   Receipt and transaction-history text parsing
   site-url.ts              Canonical deployment origin
 scripts/
   build-offline.mjs        Generate the production offline worker
+  prepare-ocr-assets.mjs   Copy the OCR runtime into the static build inputs
   serve.mjs                Serve the static export locally
 tests/
   finance.test.ts          Data and persistence tests
+  ocr.test.ts              Synthetic receipt and bank-history parser tests
 public/
   manifest.webmanifest     Installable web app metadata
   icons/                   App icons
@@ -240,4 +255,4 @@ The project uses AI-assisted development. The motivation, intended workflows, vi
 - [ ] Explore optional cloud backup with narrowly scoped, revocable access.
 - [ ] Evaluate IndexedDB if ledger size or write frequency outgrows localStorage.
 
-Bank synchronization, automatic multi-device sync, encrypted local records, and integrated cloud backup are outside the current release. Net cashflow means recorded income minus recorded expenses; it is not a verified bank balance.
+Bank synchronization, automatic multi-device sync, encrypted local records, and integrated cloud backup are outside the current release. OCR is a convenience layer rather than a verified bank import, so the review step remains required. Net cashflow means recorded income minus recorded expenses; it is not a verified bank balance.

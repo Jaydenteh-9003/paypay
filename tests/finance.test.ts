@@ -29,8 +29,9 @@ test('storage failures do not return success or overwrite corrupted data', () =>
 });
 test('backup validation rejects bad amounts, categories, duplicates, dates and budgets', () => {
   const valid = { ...emptyLedger(), transactions: [entry] }; assert.deepEqual(validateLedger(JSON.parse(JSON.stringify(valid))), valid);
-  for (const value of [{ ...valid, version: 2 }, { ...valid, transactions: [entry, entry] }, { ...valid, budgets: { '2026-13': 100 } }, { ...valid, transactions: [{ ...entry, amountCents: -100 }] }, { ...valid, transactions: [{ ...entry, amountCents: 12.5 }] }, { ...valid, transactions: [{ ...entry, category: 'Allowance' }] }, { ...valid, transactions: [{ ...entry, date: '2026-02-30' }] }]) assert.throws(() => validateLedger(value));
+  for (const value of [{ ...valid, version: 2 }, { ...valid, transactions: [entry, entry] }, { ...valid, budgets: { '2026-13': 100 } }, { ...valid, transactions: [{ ...entry, amountCents: -100 }] }, { ...valid, transactions: [{ ...entry, amountCents: 12.5 }] }, { ...valid, transactions: [{ ...entry, category: '   ' }] }, { ...valid, transactions: [{ ...entry, date: '2026-02-30' }] }]) assert.throws(() => validateLedger(value));
   assert.throws(() => validateTransaction({ ...entry, title: '   ' }));
+  assert.equal(validateTransaction({ ...entry, category: 'Campus meals' }).category, 'Campus meals');
 });
 test('restore merges unique IDs and preserves existing entries and budgets', () => {
   const current = { ...emptyLedger(), transactions: [entry], budgets: { '2026-09': 100000 } };
